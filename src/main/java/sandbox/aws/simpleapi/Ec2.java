@@ -1,12 +1,12 @@
 package sandbox.aws.simpleapi;
 
-import org.springframework.retry.RetryCallback;
-import org.springframework.retry.support.RetryTemplateBuilder;
 import software.amazon.awssdk.services.ec2.Ec2Client;
 import software.amazon.awssdk.services.ec2.model.*;
 
 import java.util.List;
 import java.util.Stack;
+
+import static sandbox.aws.simpleapi.Retry.retry;
 
 public class Ec2 {
     private final Ec2Client ec2;
@@ -66,7 +66,7 @@ public class Ec2 {
         return resp(ec2.runInstances(RunInstancesRequest.builder()
                 .imageId(amiId)
                 .instanceType(type)
-                .subnetId(subnet.subnetId())
+                .subnetId(subnet.id)
                 .securityGroupIds(securityGroupId)
                 .minCount(1).maxCount(1)
                 .keyName(keyname)
@@ -89,9 +89,13 @@ public class Ec2 {
         for (String addr: allocatedIps)
             ec2.releaseAddress(ReleaseAddressRequest.builder().allocationId(addr).build());
     }
-    public String createSecurityGroup(Vpc vpc, String name, String description, List<SecRules> ingressRules) {
+    public String createSecGroup(Vpc vpc, String name, String description, List<SecRules> ingressRules) {
         String gId = resp(ec2.createSecurityGroup(
-                CreateSecurityGroupRequest.builder().groupName(name).vpcId(vpc.vpcId()).description(description).build())
+                CreateSecurityGroupRequest.builder()
+                        .groupName(name)
+                        .description(description)
+                        .tagSpecifications(ec2Tag(ResourceType.SECURITY_GROUP, "Name", name))
+                        .vpcId(vpc.vpcId()).build())
         ).groupId();
 
         for (SecRules rule : ingressRules)
@@ -122,7 +126,7 @@ public class Ec2 {
                     .domain(DomainType.VPC)
                     .build()).allocationId();
         NatGateway gw = resp(ec2.createNatGateway(CreateNatGatewayRequest.builder()
-                .subnetId(subnet.subnetId())
+                .subnetId(subnet.id)
                 .connectivityType(ConnectivityType.PUBLIC)
                 .allocationId(allocationId)
                 .tagSpecifications(ec2Tag(ResourceType.NATGATEWAY, "Name", name))
@@ -142,13 +146,6 @@ public class Ec2 {
         });
     }
 
-    private static <T> void retry(Object obj, RetryCallback<T, RuntimeException> retryCallback) {
-        new RetryTemplateBuilder()
-                .exponentialBackoff(1000, 2, 20_000).withinMillis(300_000).build()
-                .execute(retryCallback, (c) -> {
-                    throw new IllegalStateException("After " + c.getRetryCount() + " attempts, still didn't succeed: " + obj);
-                });
-    }
     InternetGateway createInternetGateway(Vpc vpc, String name) {
         InternetGateway igw = resp(ec2.createInternetGateway(CreateInternetGatewayRequest.builder()
                 .tagSpecifications(ec2Tag(ResourceType.INTERNET_GATEWAY, "Name", name))
@@ -167,21 +164,21 @@ public class Ec2 {
         for (Subnet subnet : associateWith) {
             ec2.associateRouteTable(AssociateRouteTableRequest.builder()
                     .routeTableId(rt.routeTableId())
-                    .subnetId(subnet.subnetId()).build());
+                    .subnetId(subnet.id).build());
         }
         return rt;
     }
     public Subnet createSubnet(Vpc vpc, String az, String cidr, boolean pub) {
-        String pubPrivPrefix = pub ? "-Pub-" : "-Priv-";
-        Subnet subnet = resp(ec2.createSubnet(CreateSubnetRequest.builder()
+        String pubPrivPrefix = pub ? "-Pub" : "-Priv";
+        Subnet subnet = new Subnet(resp(ec2.createSubnet(CreateSubnetRequest.builder()
                 .vpcId(vpc.vpcId())
                 .cidrBlock(cidr)
-                .tagSpecifications(subnetTag("Name", name(vpc.tags()) + pubPrivPrefix + az))
+                .tagSpecifications(subnetTag("Name", name(vpc.tags()) + pubPrivPrefix))
                 .availabilityZone(az)
-                .build())).subnet();
+                .build())).subnet().subnetId());
         if (pub)
             ec2.modifySubnetAttribute(ModifySubnetAttributeRequest.builder()
-                    .subnetId(subnet.subnetId())
+                    .subnetId(subnet.id)
                     .mapPublicIpOnLaunch(bool(pub)).build());
         return subnet;
     }
