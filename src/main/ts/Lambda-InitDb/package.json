@@ -1,0 +1,11 @@
+{
+  "name": "lambda-init-db",
+  "description": "Runs init SQL scripts after RDS is deployed. Needed to create databases and users for our app.",
+  "version": "0.1.0",
+  "dependencies": {
+    "pg": "8.8.0"
+  },
+  "devDependencies": {
+    "@aws-sdk/client-secrets-manager": "3.213.0"
+  }
+}
