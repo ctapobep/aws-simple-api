@@ -6,16 +6,14 @@ import {Networks} from "../lib/Networks";
 import {App, Stack} from "aws-cdk-lib";
 
 const app = new App();
-const appStack = new Stack(app, 'HelloWorld');
-// re-creating network takes ~5mins, so keeping it separate to optimize destroy-deploy cycle
-const networkingStack = new Stack(app, 'HelloWorldNetwork');
+const mainStack = new Stack(app, 'HelloWorld');
 
-const networkInfo = Networks.with2Subnets(networkingStack);
-const dbClientSg = Databases.clientSecurityGroup(networkingStack, networkInfo.vpc);
-const dbSg = Databases.dbSecurityGroup(networkingStack, networkInfo.vpc, dbClientSg);
+const networkInfo = Networks.with2Subnets(mainStack);
+const dbClientSg = Databases.clientSecurityGroup(mainStack, networkInfo.vpc);
+const dbSg = Databases.dbSecurityGroup(mainStack, networkInfo.vpc, dbClientSg);
 
-const dbInfo = Databases.postgresAurora(appStack, networkInfo, dbSg);
-Lambdas.initDb(appStack, dbInfo, networkInfo, [dbClientSg]);
+const dbInfo = Databases.postgresAurora(mainStack, networkInfo, dbSg);
+Lambdas.initDb(mainStack, dbInfo, networkInfo, [dbClientSg]);
 
 // new RdsStack(app, 'TsStack', {
   /* If you don't specify 'env', this stack will be environment-agnostic.
