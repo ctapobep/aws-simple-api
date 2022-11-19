@@ -5,13 +5,12 @@ import {DatabaseInfo} from "./DatabaseInfo";
 import {Duration} from "aws-cdk-lib";
 import {NetworkInfo} from "./NetworkInfo";
 import {SecurityGroup, SubnetType} from "aws-cdk-lib/aws-ec2";
-import {Triggers} from "./Triggers";
 
 export class Lambdas {
     static initDb = function (scope: Construct,
-                              dbProps: DatabaseInfo, networkProps: NetworkInfo, sgs: SecurityGroup[]): void {
+                              dbProps: DatabaseInfo, networkProps: NetworkInfo, sgs: SecurityGroup[]): lambda.Function {
         const scriptDir = 'Lambda-InitDb';
-        Triggers.onDeploy(scope, scriptDir, Lambdas.createLambda(scope, scriptDir, dbProps, networkProps, sgs));
+        return Lambdas.createLambda(scope, scriptDir, dbProps, networkProps, sgs);
     }
 
     private static createLambda = function (scope: Construct, scriptDir: string, props: DatabaseInfo,

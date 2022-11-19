@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import 'source-map-support/register';
 import {Databases} from '../lib/Databases';
-import {Lambdas} from '../lib/Lambdas';
 import {Networks} from "../lib/Networks";
 import {App, Stack} from "aws-cdk-lib";
 
@@ -12,8 +11,7 @@ const networkInfo = Networks.with2Subnets(mainStack);
 const dbClientSg = Databases.clientSecurityGroup(mainStack, networkInfo.vpc);
 const dbSg = Databases.dbSecurityGroup(mainStack, networkInfo.vpc, dbClientSg);
 
-const dbInfo = Databases.postgresAurora(mainStack, networkInfo, dbSg);
-Lambdas.initDb(mainStack, dbInfo, networkInfo, [dbClientSg]);
+const dbInfo = Databases.postgresAurora(mainStack, networkInfo, dbSg, dbClientSg);
 
 // new RdsStack(app, 'TsStack', {
   /* If you don't specify 'env', this stack will be environment-agnostic.

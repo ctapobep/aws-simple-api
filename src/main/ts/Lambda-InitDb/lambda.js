@@ -9,14 +9,18 @@ exports.handler = async function(event) {
     const appUserConnectionProps = await _getConnectionPropsFromSecret(_requiredEnv('DB_APP_SECRET_ARN'));
 
     const client = await _createConnection(adminUserConnectionProps);
-    await _createDbAndUser(client, appUserConnectionProps);
-    await _createAppSchema(client, adminUserConnectionProps, appUserConnectionProps);
+    let resultMessage = 'The database was already initialized, do nothing;'
+    if(!(await _dbAlreadySetUp(client, appUserConnectionProps))) {
+        await _createDbAndUser(client, appUserConnectionProps);
+        await _createAppSchema(client, adminUserConnectionProps, appUserConnectionProps);
+        resultMessage = 'Created database, role and schema for the app.';
+    }
     await client.end();
 
     return {
         statusCode: 200,
         headers: { "Content-Type": "text/plain" },
-        body: 'Created database, role and schema for the app.'
+        body: resultMessage
     };
 };
 
@@ -35,6 +39,20 @@ async function _createAppSchema(client, adminUserConnectionProps, appUserConnect
     query = `create schema ${SCHEMA_NAME} authorization ${user}`;
     console.info('Creating schema: \n' + query);
     await client.query(query);
+}
+
+/**
+ *
+ * @param {Client} client
+ * @param {{database}} appUserConnectionProps
+ * @return {Promise<boolean>}
+ * @private
+ */
+async function _dbAlreadySetUp(client, appUserConnectionProps) {
+    const query = `SELECT datname FROM pg_database where datname='${appUserConnectionProps.database}'`;
+    console.info('Checking if the we have already set up the database:\n', query);
+    const res = await client.query(query);
+    return res.rows.length > 0;
 }
 
 async function _createDbAndUser(client, appUserConnectionProps) {
